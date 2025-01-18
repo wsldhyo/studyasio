@@ -16,7 +16,7 @@
 #include <system_error>
 #include <vector>
 
-#include "class_and_func.hpp"
+#include "../include/class_and_func.hpp"
 inline int client_end_point() {
   // 需要知道对端（服务器）的ip和端口号
   std::string raw_ip_address = "127.4.8.1";
@@ -206,6 +206,7 @@ inline void use_buffer_arr() {
 inline void write_to_socket(asio::ip::tcp::socket &sock) {
   std::string str = "Hello World";
   std::size_t total_bytes_written = 0;
+  // 循环发送数据
   // 用户缓冲区可以根据OS开辟足够大的空间, 而TCP缓冲区有限，所以每次发送一点
   // write_some每次返回实际写入到TCP缓冲区的字节数
   while (total_bytes_written != str.length()) {
@@ -213,6 +214,7 @@ inline void write_to_socket(asio::ip::tcp::socket &sock) {
         asio::buffer(static_cast<void *>(str.data() + total_bytes_written),
                      str.length() - total_bytes_written);
     total_bytes_written += sock.write_some(buf);
+
   }
 }
 
@@ -224,7 +226,53 @@ inline int send_data_by_write_some() {
     asio::io_context ioc;
     asio::ip::tcp::socket sock(ioc, ep.protocol());
     sock.connect(ep);
-    write_to_socket(sock);
+    // 一次发送所有数据，
+    //write_to_socket(sock);
+    std::string buf{"Hello World"};
+    // 数据没发送完，则阻塞。
+    // send返回值有三种情况，小于0系统错误，=0对方关闭连接，>0发送完毕并且返回值一定等于发送长度 
+    auto send_length {sock.send(asio::buffer(buf.data(), buf.length()))};
+    if(send_length < 0){
+      return 0;
+    }
+  } catch (std::system_error &e) {
+    std::cout << "Error occured! Error Code = " << e.code().value()
+              << "Message: " << e.code().message() << std::endl;
+    return e.code().value();
+  }
+  return 0;
+}
+
+inline std::string read_from_socket(asio::ip::tcp::socket& sock){
+  unsigned char const MESSAGE_SIZE {20};
+  char buf[MESSAGE_SIZE]{0};
+  std::size_t total_bytes_read{0};
+  // read_some每次读取一定数量的内存，并返回实际读取长度
+  // 每读满buf时，一直读取
+  while (total_bytes_read != MESSAGE_SIZE) {
+    total_bytes_read += sock.read_some(asio::buffer(buf +total_bytes_read, MESSAGE_SIZE - total_bytes_read));
+  }
+
+
+}
+
+inline int write_data_by_write_some() {
+  std::string raw_ip_string = "192.168.3.11";
+  port_t port_num = 3333;
+  try {
+    asio::ip::tcp::endpoint ep(asio::ip::make_address(raw_ip_string), port_num);
+    asio::io_context ioc;
+    asio::ip::tcp::socket sock(ioc, ep.protocol());
+    sock.connect(ep);
+    unsigned char const BUF_SIZE{7};
+    char buffer_receive[BUF_SIZE];
+    // 返回值类似socket::send
+    // 也可以用asio::read(sock, buffer);来读取
+    std::size_t bytes_receive_len{sock.receive(asio::buffer(buffer_receive, BUF_SIZE))};
+    if(bytes_receive_len <= 0){
+      std::cout << "receive failed" << std::endl;
+      return 0;
+    }
   } catch (std::system_error &e) {
     std::cout << "Error occured! Error Code = " << e.code().value()
               << "Message: " << e.code().message() << std::endl;

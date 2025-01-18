@@ -67,5 +67,9 @@ inline void use_buffer_arr();
 inline void write_to_socket(asio::ip::tcp::socket & sock);
 
 inline int send_data_by_write_some();
+
+inline std::string read_from_socket(asio::ip::tcp::socket& sock);
+
+inline int write_data_by_read_some();
 #endif
 
