@@ -6,95 +6,66 @@
 #include <asio/ip/tcp.hpp>
 #include <asio/system_error.hpp>
 #include <cstddef>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <queue>
 
-// 与客户端通信的一个会话类
-// 每个连接都将产生一个会话
-// Session负责处理一个连接的读和写
-class SessionErr {
+inline constexpr short MSG_HEAD_LEN{2};
+inline constexpr int MAX_LENGTH{2 * 1024};
+inline constexpr int MAX_SEND_QUE{1000};
+inline constexpr int MAX_RECV_QUE{1000};
+
+/// 以tlv格式设计MsgNode，方便应用层对TCP流数据切包
+class MsgNode {
+  friend class CSession;
+
 public:
-  explicit SessionErr(asio::io_context &ioc);
-
-  asio::ip::tcp::socket &socket();
-
-  void start();
-
-private:
-  // 处理从对端读取数据的回调
-  void handle_read_(asio::error_code const &ec, std::size_t bytes_tranferred);
-   // 处理向对端写入事件的回调
-  void handle_write_(asio::error_code const &ec);
+  explicit MsgNode(short msg_len);
+  MsgNode(char *msg, int len);
+  ~MsgNode();
+  /// 清除data里的数据，长度置0, 以待下次使用
+  // 实际上并不需要清空，拷贝数据后将最后一个字节置\0即可
+  void clear();
 
 private:
-  asio::ip::tcp::socket sock_;
-  enum { MAX_LENGTH = 1024 };
-  char data_[MAX_LENGTH];
+  int cur_len; //
+  int total_len;
+  char *data;
 };
-
 class CServer;
 class CSession : public std::enable_shared_from_this<CSession> {
+public:
+  using sp_msg_t = std::shared_ptr<MsgNode>;
+  using sp_Session_t = std::shared_ptr<CSession>;
+
 public:
   CSession(asio::io_context &ioc, CServer *server);
 
   asio::ip::tcp::socket &socket();
   std::string &get_uuid();
   void start();
-
-private:
-  void handle_read_(asio::error_code const &ec, std::size_t bytes_tranferred,
-                    std::shared_ptr<CSession> sp_self);
-  void handle_write_(asio::error_code const &ec,
-                     std::shared_ptr<CSession> sp_self);
-
-private:
-  asio::ip::tcp::socket sock_;
-  enum { MAX_LENGTH = 1024 };
-  char data_[MAX_LENGTH];
-  CServer *server_;
-  std::string uuid_;
-};
-
-/// 增加发送队列实现全双工通信
-class MsgNode {
-  friend class CSession2;
-
-public:
-  MsgNode(char *msg, int max_len) {
-    data = new char[max_len];
-    memcpy(data, msg, max_len);
-    this->max_len = max_len;
-  }
-  ~MsgNode() { delete[] data; }
-private:
-  int cur_len; //
-  int max_len;
-  char *data;
-};
-class CServer2;
-class CSession2 : public std::enable_shared_from_this<CSession2> {
-public:
-  CSession2(asio::io_context &ioc, CServer2 *server);
-
-  asio::ip::tcp::socket &socket();
-  std::string &get_uuid();
-  void start();
   void send(char *msg, int max_length);
+  // 关闭socket
+  void close();
+private:
+  void handle_read_callback_(asio::error_code const &ec,
+                             std::size_t bytes_tranferred,
+                             sp_Session_t sp_self);
+  void handle_write_callback_(asio::error_code const &ec, sp_Session_t sp_self);
 
 private:
-  void handle_read_(asio::error_code const &ec, std::size_t bytes_tranferred,
-                    std::shared_ptr<CSession2> sp_self);
-  void handle_write_(asio::error_code const &ec,
-                     std::shared_ptr<CSession2> sp_self);
-
-private:
+  CServer *server_;
   asio::ip::tcp::socket sock_;
-  enum { MAX_LENGTH = 1024 };
-  char data_[MAX_LENGTH];
-  CServer2 *server_;
   std::string uuid_;
-  std::queue<std::shared_ptr<MsgNode>> send_que_;  // 异步发送队列
+  char data_[MAX_LENGTH];
+  
+  std::queue<sp_msg_t> send_que_; // 异步发送队列
   std::mutex send_lock_;
+
+  bool b_close_;
+  bool b_head_parse_;       // 头部消息是否发送完毕
+  sp_msg_t recv_msg_node_;  // 收到的头部消息结构
+  sp_msg_t recv_head_node_; // 收到的消息结构
 };
 #endif

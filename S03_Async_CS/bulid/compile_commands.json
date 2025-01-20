@@ -1,0 +1,22 @@
+[
+{
+  "directory": "/home/crain/C++/Asio/S03_Async_CS/bulid/client",
+  "command": "/usr/bin/c++   -pthread -std=gnu++17 -o CMakeFiles/client.dir/src/main.cc.o -c /home/crain/C++/Asio/S03_Async_CS/client/src/main.cc",
+  "file": "/home/crain/C++/Asio/S03_Async_CS/client/src/main.cc"
+},
+{
+  "directory": "/home/crain/C++/Asio/S03_Async_CS/bulid/server",
+  "command": "/usr/bin/c++   -pthread -g -std=gnu++17 -o CMakeFiles/server.dir/src/main.cc.o -c /home/crain/C++/Asio/S03_Async_CS/server/src/main.cc",
+  "file": "/home/crain/C++/Asio/S03_Async_CS/server/src/main.cc"
+},
+{
+  "directory": "/home/crain/C++/Asio/S03_Async_CS/bulid/server",
+  "command": "/usr/bin/c++   -pthread -g -std=gnu++17 -o CMakeFiles/server.dir/src/session.cc.o -c /home/crain/C++/Asio/S03_Async_CS/server/src/session.cc",
+  "file": "/home/crain/C++/Asio/S03_Async_CS/server/src/session.cc"
+},
+{
+  "directory": "/home/crain/C++/Asio/S03_Async_CS/bulid/server",
+  "command": "/usr/bin/c++   -pthread -g -std=gnu++17 -o CMakeFiles/server.dir/src/server.cc.o -c /home/crain/C++/Asio/S03_Async_CS/server/src/server.cc",
+  "file": "/home/crain/C++/Asio/S03_Async_CS/server/src/server.cc"
+}
+]
