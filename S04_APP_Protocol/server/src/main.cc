@@ -1,4 +1,4 @@
-#include "server.hpp"
+#include "../include/server.hpp"
 #include <exception>
 #include <iostream>
 
@@ -7,7 +7,7 @@ int main(int argc, char* argv[])
     try{
         asio::io_context ioc;
         //ServerErr s(ioc, 10086);
-        CServer2 s(ioc, 10086);
+        CServer s(ioc, 10086);
         ioc.run(); // 启动事件循环
     }
     catch(std::exception& e){

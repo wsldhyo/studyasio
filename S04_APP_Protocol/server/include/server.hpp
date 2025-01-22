@@ -1,20 +1,28 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 #include "session.hpp"
+#include <asio/error_code.hpp>
+#include <asio/system_error.hpp>
 #include <string>
 #include <map>
 #include <memory>
 
-class CServer{
+#include <asio.hpp>
+#include "../include/session.hpp"
+#include <memory.h>
+#include <map>
+
+class CServer
+{
 public:
-    CServer(asio::io_context& ioc, short port_num);
-    void remove_session(std::string& uuid); 
+	CServer(asio::io_context& io_context, short port);
+	void remove_session(std::string);
 private:
-    void start_accept();
-    void handle_accept(std::shared_ptr<CSession> new_session, asio::error_code const& ec);
-private:
-    asio::io_context& ioc_;
-    asio::ip::tcp::acceptor acceptor_;
-    std::map<std::string, std::shared_ptr<CSession>> sessions_;
+	void accept_callback_(std::shared_ptr<CSession>, const asio::error_code & error);
+	void start_accept_();
+	asio::io_context &_io_context;
+	short _port;
+	tcp::acceptor _acceptor;
+	std::map<std::string, std::shared_ptr<CSession>> _sessions;
 };
 #endif

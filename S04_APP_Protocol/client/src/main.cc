@@ -7,11 +7,13 @@
 #include <asio/ip/tcp.hpp>
 #include <asio/system_error.hpp>
 #include <cstddef>
+#include <cstring>
 #include <exception>
 #include <iostream>
 using asio::ip::tcp;
 
-constexpr std::size_t MAX_MSG_LEN{1024};
+constexpr std::size_t MAX_MSG_LEN{2 * 1024};
+constexpr std::size_t MSG_HEAD_LEN{2};
 int main(int argc, char *argv[]) {
   try {
     asio::io_context ioc;
@@ -31,13 +33,28 @@ int main(int argc, char *argv[]) {
       std::cout << "Enter message:";
       char buf[MAX_MSG_LEN];
       std::cin.getline(buf, MAX_MSG_LEN);
-      auto actual_send_len = strlen(buf);
-      asio::write(sock, asio::buffer(buf, actual_send_len));
-      char reply_buf[MAX_MSG_LEN];
+      auto send_msg_len = strlen(buf);
+      std::cout << "msg_len " << send_msg_len << std::endl;
+      char send_data[MAX_MSG_LEN];
+      memcpy(send_data, &send_msg_len, MSG_HEAD_LEN );
+      memcpy(send_data + MSG_HEAD_LEN, buf, send_msg_len);
+      asio::write(sock, asio::buffer(send_data, send_msg_len + MSG_HEAD_LEN));
+      
+      char reply_head[MSG_HEAD_LEN];
       auto reply_len{
-          asio::read(sock, asio::buffer(reply_buf, actual_send_len))};
-      std::cout << "Reply: " << reply_buf << std::endl;
+          asio::read(sock, asio::buffer(reply_head, MSG_HEAD_LEN))};
+      
+      short recv_msg_len = 0;
+      memcpy(&recv_msg_len , reply_head, MSG_HEAD_LEN);
+      char reply_buf[MAX_MSG_LEN];
+      asio::read(sock, asio::buffer(reply_buf, recv_msg_len));
+      
+      std::cout << "Reply: ";
+      std::cout.write(reply_buf, recv_msg_len) << std::endl;
+      std::cout << "Reply len is " << recv_msg_len << std::endl; 
     }
+
+
 
   } catch (std::exception &e) {
     std::cerr << "Exception: " << e.what() << std::endl;

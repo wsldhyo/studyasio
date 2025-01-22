@@ -1,42 +1,31 @@
 #include "../include/server.hpp"
 #include <boost/uuid/random_generator.hpp>
 #include <iostream>
-CServer::CServer(asio::io_context &ioc, short port_num)
-    : ioc_(ioc),
-      acceptor_(ioc, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port_num)) {
 
-  std::cout << "CServerstart success on port:" << port_num << std::endl;
-  start_accept();
+CServer::CServer(asio::io_context &io_context, short port)
+    : _io_context(io_context), _port(port),
+      _acceptor(io_context, tcp::endpoint(tcp::v4(), port)) {
+  std::cout << "Server start success, listen on port : " << _port << std::endl;
+  start_accept_();
 }
 
-void CServer::start_accept() {
-  auto new_session = std::make_shared<CSession>(ioc_, this);
-  // std::bind按值传递智能指针，引用计数+1。
-  // 该函数结束，new_session变量生命周期结束，n
-  // 但智能指针的生命周期与std::bind返回的函数对象一致
-  acceptor_.async_accept(new_session->socket(),
-                         std::bind(&CServer::handle_accept, this, new_session,
-                                   std::placeholders::_1));
-}
-void CServer::handle_accept(std::shared_ptr<CSession> new_session,
-                            asio::error_code const &ec) {
-  if (!ec) {
-    std::cout << "connect client from: "
-              << new_session->socket().remote_endpoint().address().to_v4()
-              << "!\n";
-
+void CServer::accept_callback_(std::shared_ptr<CSession> new_session,
+                           const asio::error_code &error) {
+  if (!error) {
     new_session->start();
-    sessions_.insert(std::make_pair(new_session->get_uuid(), new_session));
-  }
-  else {
-  
+    _sessions.insert(make_pair(new_session->get_uuid(), new_session));
+  } else {
+    std::cout << "session accept failed, error is " << error.message() << std::endl;
   }
 
-  // 接受新连接
-  start_accept();
+  start_accept_();
 }
 
-void CServer::remove_session(std::string& uuid)
-{
-    sessions_.erase(uuid);
+void CServer::start_accept_() {
+  std::shared_ptr<CSession> new_session = std::make_shared<CSession>(_io_context, this);
+  _acceptor.async_accept(
+      new_session->get_socket(),
+      std::bind(&CServer::accept_callback_, this, new_session, std::placeholders::_1));
 }
+
+void CServer::remove_session(std::string uuid) { _sessions.erase(uuid); }
