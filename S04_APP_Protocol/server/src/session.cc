@@ -1,4 +1,5 @@
 #include "../include/server.hpp"
+#include <asio/detail/socket_ops.hpp>
 #include <cstring>
 #include <iostream>
 #include <ostream>
@@ -6,9 +7,8 @@ MsgNode::MsgNode(char *msg, short max_len)
     : total_len(max_len + HEAD_LENGTH), cur_len(0) {
   data = new char[total_len + 1]();
   // 转为网络字节序
-  // int max_len_host =
-  // asio::detail::socket_ops::host_to_network_short(max_len);
-  memcpy(data, &max_len, HEAD_LENGTH);
+   int max_len_host = asio::detail::socket_ops::host_to_network_short(max_len);
+  memcpy(data, &max_len_host, HEAD_LENGTH);
   memcpy(data + HEAD_LENGTH, msg, max_len);
   data[total_len] = '\0';
 }
@@ -124,7 +124,7 @@ void CSession::handle_read_callback_(const asio::error_code &error,
         short data_len = 0;
         memcpy(&data_len, recv_head_node_->data, HEAD_LENGTH);
         // 网络字节序转化为本地字节序
-        // data_len=asio::detail::socket_ops::network_to_host_short(data_len);
+        data_len =asio::detail::socket_ops::network_to_host_short(data_len);
         std::cout << "data_len is " << data_len << std::endl;
         // 头部长度非法
         if (data_len > MAX_LENGTH) {
