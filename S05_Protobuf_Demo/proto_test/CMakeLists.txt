@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.20)
 project(async_echo_server)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
-
 # 添加 Protobuf 搜索路径
 list(APPEND CMAKE_PREFIX_PATH "/usr/local/protobuf")
 
@@ -23,7 +22,7 @@ include_directories(${Protobuf_INCLUDE_DIRS})
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS msg.proto)
 
 # 添加可执行文件
-add_executable(main main.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(main main.cc ${PROTO_SRCS} ${PROTO_HDRS})
 
 # 链接 Protobuf 库
 target_link_libraries(main ${Protobuf_LIBRARIES} absl::log_internal_check_op)
