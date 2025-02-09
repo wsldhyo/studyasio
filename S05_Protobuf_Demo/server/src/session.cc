@@ -3,13 +3,14 @@
 #include <cstring>
 #include <iostream>
 #include <ostream>
+#include <unistd.h>
 
 #include "../proto_msg/msg.pb.h"
 MsgNode::MsgNode(char *msg, short max_len)
     : total_len(max_len + HEAD_LENGTH), cur_len(0) {
   data = new char[total_len + 1]();
   // 转为网络字节序
-   int max_len_host = asio::detail::socket_ops::host_to_network_short(max_len);
+  int max_len_host = asio::detail::socket_ops::host_to_network_short(max_len);
   memcpy(data, &max_len_host, HEAD_LENGTH);
   memcpy(data + HEAD_LENGTH, msg, max_len);
   data[total_len] = '\0';
@@ -51,8 +52,8 @@ void CSession::send(char *msg, int max_length) {
   std::lock_guard<std::mutex> lock(send_lock_);
   int send_que_size = send_que_.size();
   if (send_que_size > MAX_SENDQUE) {
-    std::cout << "session: " << uuid_ << " send que fulled, size is " << MAX_SENDQUE
-         << std::endl;
+    std::cout << "session: " << uuid_ << " send que fulled, size is "
+              << MAX_SENDQUE << std::endl;
     return;
   }
 
@@ -70,8 +71,8 @@ void CSession::send(std::string msg) {
   std::lock_guard<std::mutex> lock(send_lock_);
   int send_que_size = send_que_.size();
   if (send_que_size > MAX_SENDQUE) {
-    std::cout << "session: " << uuid_ << " send que fulled, size is " << MAX_SENDQUE
-         << std::endl;
+    std::cout << "session: " << uuid_ << " send que fulled, size is "
+              << MAX_SENDQUE << std::endl;
     return;
   }
 
@@ -93,11 +94,12 @@ void CSession::close() {
 std::shared_ptr<CSession> CSession::shared_self() { return shared_from_this(); }
 
 void CSession::handle_write_callback_(const asio::error_code &error,
-                           std::shared_ptr<CSession> shared_self) {
+                                      std::shared_ptr<CSession> shared_self) {
 
   if (!error) {
     std::lock_guard<std::mutex> lock(send_lock_);
-    std::cout << "send data " << send_que_.front()->data + HEAD_LENGTH << std::endl;
+    std::cout << "send data " << send_que_.front()->data + HEAD_LENGTH
+              << std::endl;
     send_que_.pop();
     if (!send_que_.empty()) {
       auto &msgnode = send_que_.front();
@@ -107,15 +109,16 @@ void CSession::handle_write_callback_(const asio::error_code &error,
                                   std::placeholders::_1, shared_self));
     }
   } else {
-    std::cout << "handle write failed, error is " << error.message() << std::endl;
+    std::cout << "handle write failed, error is " << error.message()
+              << std::endl;
     close();
     server_->remove_session(uuid_);
   }
 }
 
 void CSession::handle_read_callback_(const asio::error_code &error,
-                          size_t bytes_transferred,
-                          std::shared_ptr<CSession> shared_self) {
+                                     size_t bytes_transferred,
+                                     std::shared_ptr<CSession> shared_self) {
   if (!error) {
     // 已经移动的字符数
     int copy_len = 0;
@@ -127,10 +130,11 @@ void CSession::handle_read_callback_(const asio::error_code &error,
                  data_ + copy_len, bytes_transferred);
           recv_head_node_->cur_len += bytes_transferred;
           ::memset(data_, 0, MAX_LENGTH);
-          socket_.async_read_some(
-              asio::buffer(data_, MAX_LENGTH),
-              std::bind(&CSession::handle_read_callback_, this, std::placeholders::_1,
-                        std::placeholders::_2, shared_self));
+          socket_.async_read_some(asio::buffer(data_, MAX_LENGTH),
+                                  std::bind(&CSession::handle_read_callback_,
+                                            this, std::placeholders::_1,
+                                            std::placeholders::_2,
+                                            shared_self));
           return;
         }
         // 收到的数据比头部多
@@ -145,7 +149,7 @@ void CSession::handle_read_callback_(const asio::error_code &error,
         short data_len = 0;
         memcpy(&data_len, recv_head_node_->data, HEAD_LENGTH);
         // 网络字节序转化为本地字节序
-        data_len =asio::detail::socket_ops::network_to_host_short(data_len);
+        data_len = asio::detail::socket_ops::network_to_host_short(data_len);
         std::cout << "data_len is " << data_len << std::endl;
         // 头部长度非法
         if (data_len > MAX_LENGTH) {
@@ -161,28 +165,32 @@ void CSession::handle_read_callback_(const asio::error_code &error,
                  data_ + copy_len, bytes_transferred);
           recv_msg_node_->cur_len += bytes_transferred;
           ::memset(data_, 0, MAX_LENGTH);
-          socket_.async_read_some(
-              asio::buffer(data_, MAX_LENGTH),
-              std::bind(&CSession::handle_read_callback_, this, std::placeholders::_1,
-                        std::placeholders::_2, shared_self));
+          socket_.async_read_some(asio::buffer(data_, MAX_LENGTH),
+                                  std::bind(&CSession::handle_read_callback_,
+                                            this, std::placeholders::_1,
+                                            std::placeholders::_2,
+                                            shared_self));
           // 头部处理完成
           b_head_parse_ = true;
           return;
         }
 
-        memcpy(recv_msg_node_->data + recv_msg_node_->cur_len,
-               data_ + copy_len, data_len);
+        memcpy(recv_msg_node_->data + recv_msg_node_->cur_len, data_ + copy_len,
+               data_len);
         recv_msg_node_->cur_len += data_len;
         copy_len += data_len;
         bytes_transferred -= data_len;
         recv_msg_node_->data[recv_msg_node_->total_len] = '\0';
-        //std::cout << "receive data is " << recv_msg_node_->data << std::endl;
+        // std::cout << "receive data is " << recv_msg_node_->data << std::endl;
         MsgData msgdata;
         std::string recv_data;
-        msgdata.ParseFromString(std::string(recv_msg_node_->data, recv_msg_node_->total_len));
-        std::cout << "recv msg id is " << msgdata.id() << " msg is " << msgdata.data() << std::endl;
+        msgdata.ParseFromString(
+            std::string(recv_msg_node_->data, recv_msg_node_->total_len));
+        std::cout << "recv msg id is " << msgdata.id() << " msg is "
+                  << msgdata.data() << std::endl;
 
-        std::string return_str = "server has received msg, msg is " + msgdata.data();
+        std::string return_str =
+            "server has received msg, msg is " + msgdata.data();
         MsgData ret_msg;
         ret_msg.set_id(msgdata.id());
         ret_msg.set_data(return_str);
@@ -195,10 +203,11 @@ void CSession::handle_read_callback_(const asio::error_code &error,
         recv_head_node_->clear();
         if (bytes_transferred <= 0) {
           ::memset(data_, 0, MAX_LENGTH);
-          socket_.async_read_some(
-              asio::buffer(data_, MAX_LENGTH),
-              std::bind(&CSession::handle_read_callback_, this, std::placeholders::_1,
-                        std::placeholders::_2, shared_self));
+          socket_.async_read_some(asio::buffer(data_, MAX_LENGTH),
+                                  std::bind(&CSession::handle_read_callback_,
+                                            this, std::placeholders::_1,
+                                            std::placeholders::_2,
+                                            shared_self));
           return;
         }
         continue;
@@ -208,13 +217,13 @@ void CSession::handle_read_callback_(const asio::error_code &error,
       // 接收的数据仍不足剩余未处理的
       int remain_msg = recv_msg_node_->total_len - recv_msg_node_->cur_len;
       if (bytes_transferred < remain_msg) {
-        memcpy(recv_msg_node_->data + recv_msg_node_->cur_len,
-               data_ + copy_len, bytes_transferred);
+        memcpy(recv_msg_node_->data + recv_msg_node_->cur_len, data_ + copy_len,
+               bytes_transferred);
         recv_msg_node_->cur_len += bytes_transferred;
         ::memset(data_, 0, MAX_LENGTH);
         socket_.async_read_some(asio::buffer(data_, MAX_LENGTH),
-                                std::bind(&CSession::handle_read_callback_, this,
-                                          std::placeholders::_1,
+                                std::bind(&CSession::handle_read_callback_,
+                                          this, std::placeholders::_1,
                                           std::placeholders::_2, shared_self));
         return;
       }
@@ -233,15 +242,16 @@ void CSession::handle_read_callback_(const asio::error_code &error,
       if (bytes_transferred <= 0) {
         ::memset(data_, 0, MAX_LENGTH);
         socket_.async_read_some(asio::buffer(data_, MAX_LENGTH),
-                                std::bind(&CSession::handle_read_callback_, this,
-                                          std::placeholders::_1,
+                                std::bind(&CSession::handle_read_callback_,
+                                          this, std::placeholders::_1,
                                           std::placeholders::_2, shared_self));
         return;
       }
       continue;
     }
   } else {
-    std::cout << "handle read failed, error is " << error.message() << std::endl;
+    std::cout << "handle read failed, error is " << error.message()
+              << std::endl;
     close();
     server_->remove_session(uuid_);
   }
