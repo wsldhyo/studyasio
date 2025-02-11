@@ -20,6 +20,7 @@ public:
   std::string &get_uuid();
   void start();
   void send(char *msg, short max_length, short msg_id);
+  void send(std::string const& msg, short msg_id);
   void close();
   std::shared_ptr<CSession> shared_self();
 

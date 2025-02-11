@@ -43,7 +43,12 @@ int main(int argc, char *argv[]) {
       std::cin.getline(buf, MAX_MSG_LEN);
       auto send_msg_len = strlen(buf);
       std::cout << "msg_len " << send_msg_len << std::endl;
-      auto send_node = std::make_shared<SendNode>(buf, send_msg_len, 1001);
+      
+      Json::Value root;
+      root["id"] = 1001;
+      root["data"] = buf;
+      auto send_msg = root.toStyledString();
+      auto send_node = std::make_shared<SendNode>(send_msg.data(), send_msg.length(), 1001);
       
       // 这里写入长度要用本地字节序表示的长度send_msg_len，而不是网络字节序表示的长度
       asio::write(sock, asio::buffer(send_node->data, send_node->total_len));
@@ -61,10 +66,11 @@ int main(int argc, char *argv[]) {
       recv_msg_id = asio::detail::socket_ops::network_to_host_short(recv_msg_id); 
       auto recv_msg_node = std::make_shared<RecvNode>(recv_msg_len, recv_msg_id);
       asio::read(sock, asio::buffer(recv_msg_node->data, recv_msg_len));
+      Json::Reader reader;
+      std::string recv_msg(recv_msg_node->data, recv_msg_node->total_len);
+      reader.parse(recv_msg, root);
 
-      std::cout << "Reply: ";
-      std::cout.write(recv_msg_node->data, recv_msg_len) << std::endl;
-      std::cout << "Reply id is " << recv_msg_id << " len is " << recv_msg_len << std::endl; 
+      std::cout << "Reply id is " << recv_msg_id << " len is " << recv_msg_len << " data is " << root["data"].asString() <<std::endl; 
     }
 
 

@@ -1,6 +1,8 @@
 #include <asio/buffer.hpp>
 #include <asio/detail/socket_ops.hpp>
 #include <asio/read.hpp>
+#include <json/reader.h>
+#include <json/value.h>
 #include <sys/socket.h>
 
 #include <cstring>
@@ -10,6 +12,7 @@
 #include <ostream>
 
 #include "../include/server.hpp"
+#include "../include/logic_sys.hpp"
 #include "../../common/msgnode.hpp"
 #include "../../common/const.h"
 CSession::CSession(asio::io_context &io_context, CServer *server)
@@ -41,6 +44,25 @@ void CSession::send(char *msg, short max_length, short msg_id) {
   }
 
   send_que_.push(std::make_shared<SendNode>(msg, max_length, msg_id));
+  if (send_que_size > 0) {
+    return;
+  }
+  auto &msgnode = send_que_.front();
+  asio::async_write(socket_, asio::buffer(msgnode->data, msgnode->total_len),
+                    std::bind(&CSession::write_callback_, this,
+                              std::placeholders::_1, shared_self()));
+}
+
+void CSession::send(std::string const& msg, short msg_id) {
+  std::lock_guard<std::mutex> lock(send_lock_);
+  int send_que_size = send_que_.size();
+  if (send_que_size > MAX_SENDQUE) {
+    std::cout << "session: " << uuid_ << " send que fulled, size is "
+              << MAX_SENDQUE << std::endl;
+    return;
+  }
+
+  send_que_.push(std::make_shared<SendNode>(msg.c_str(), msg.length(), msg_id));
   if (send_que_size > 0) {
     return;
   }
@@ -97,7 +119,7 @@ void CSession::read_head_callback_(const asio::error_code &error,
     data_id = asio::detail::socket_ops::network_to_host_short(data_id);
     data_len = asio::detail::socket_ops::network_to_host_short(data_len);
 
-    std::cout << "recv data id is " << data_id << " length is " << data_len << std::endl;
+    std::cout << "recv data length is " << data_len << std::endl;
 
     if (data_len > MAX_LENGTH) {
       std::cout << "invalid data length" << std::endl;
@@ -121,11 +143,23 @@ void CSession::read_msg_callback_(const asio::error_code &error,
                                   std::shared_ptr<CSession> shared_self) {
   if (!error) {
      recv_msg_node_->data[recv_msg_node_->total_len] = '\0';
-     std::cout << "recv msg is " << recv_msg_node_->data << std::endl;
+     //std::cout << "recv msg is " << recv_msg_node_->data << std::endl;
      // 回传给客户端
-     send(recv_msg_node_->data, recv_msg_node_->total_len, recv_msg_node_->msg_id);
-
+     //send(recv_msg_node_->data, recv_msg_node_->total_len, recv_msg_node_->msg_id);
      // 挂起读头部事件，准备读取下一消息
+     
+     // Json序列化
+     /*
+     Json::Value root;
+     Json::Reader reader;
+     std::string recv_msg(recv_msg_node_->data, recv_msg_node_->total_len);
+     reader.parse(recv_msg, root);
+     std::cout << "Recv msg is " << root["data"].asString() << std::endl;
+     std::string send_msg = root.toStyledString();
+     send(send_msg, root["id"].asInt());
+     */
+     LogicSystem::get_instance()->post_msg_to_que(std::make_shared<LogicNode>(shared_self, recv_msg_node_));
+
      recv_head_node_->clear();
      asio::async_read(socket_, asio::buffer(recv_head_node_->data, MSG_ID_LEN + MSG_DATA_LEN),
       std::bind(&CSession::read_head_callback_, this, std::placeholders::_1, std::placeholders::_2, shared_self));   
