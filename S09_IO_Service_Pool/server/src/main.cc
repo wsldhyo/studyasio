@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "../include/server.hpp"
+#include "../include/io_service_pool.hpp"
 
 bool g_stop_server{false};
 std::mutex g_quit_mutex;
@@ -23,13 +24,11 @@ void signal_handler(int sig) {
 }
 
 
-void cstyle_quit_server()
+void cstyle_quit_server(IOServicePool & pool)
 {
 
   try {
     asio::io_context ioc;
-    // ServerErr s(ioc, 10086);
-
     std::thread net_work_thread([&ioc]() {
       CServer s(ioc, 10086);
       ioc.run(); // 启动事件循环
@@ -44,6 +43,7 @@ void cstyle_quit_server()
     }
 
     ioc.stop(); // 关闭ioc服务
+    pool.stop();
     net_work_thread.join();
   } catch (std::exception &e) {
     std::cerr << "Exception: " << e.what() << std::endl;
@@ -53,14 +53,15 @@ void cstyle_quit_server()
 
 
 
-void asio_quit_server(){
+void asio_quit_server(IOServicePool & pool){
     try {
-    asio::io_context ioc;
+    auto ioc = asio::io_context{}; 
     // 注册信号事件
     asio::signal_set signal(ioc, SIGINT, SIGTERM);
-    signal.async_wait([&ioc](auto, auto){
+    signal.async_wait([&ioc, &pool](auto, auto){
         // signal注册的信号触发时，停止ioc服务，
         ioc.stop();
+        pool.stop();
     });
 
     CServer s(ioc, 10086);
@@ -72,6 +73,7 @@ void asio_quit_server(){
 }
 
 int main(int argc, char *argv[]) {
-    asio_quit_server();
+    auto pool = IOServicePool::get_instance()->get_instance();
+    asio_quit_server(*pool);
   return 0;
 }
